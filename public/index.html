@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 Student Check-in Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    body { background: #f8f9fa; font-family: 'Sarabun', sans-serif; }
+    .card { border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); color: #fff; }
+    .card.present { background: #28a745; }
+    .card.late { background: #6c757d; }
+    .card.absent { background: #dc3545; }
+    .card.leave { background: #ffc107; color: #000; }
+    .card.checkout { background: #6f42c1; }
+    .card.notcheckout { background: #0d6efd; }
+    table img { border-radius: 6px; cursor: pointer; }
+    .list-group-item { font-size: 0.95rem; }
+  </style>
+</head>
+<body class="p-3">
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">📊 Dashboard</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link active" href="index.html">📊 ภาพรวม</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="student.html">📖 รายงานรายบุคคล</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <h2 class="text-center mb-4">📊 แดชบอร์ดเช็คชื่อนักเรียน</h2>
+
+  <div class="row row-cols-2 row-cols-md-6 g-3 text-center mb-4">
+    <div class="col"><div class="card present p-2"><h6>มาเรียน</h6><h4 id="presentCount">0</h4></div></div>
+    <div class="col"><div class="card late p-2"><h6>มาสาย</h6><h4 id="lateCount">0</h4></div></div>
+    <div class="col"><div class="card absent p-2"><h6>ขาด</h6><h4 id="absentCount">0</h4></div></div>
+    <div class="col"><div class="card leave p-2"><h6>ลา</h6><h4 id="leaveCount">0</h4></div></div>
+    <div class="col"><div class="card checkout p-2"><h6>กลับบ้าน</h6><h4 id="checkoutCount">0</h4></div></div>
+    <div class="col"><div class="card notcheckout p-2"><h6>ไม่สแกนกลับ</h6><h4 id="notCheckoutCount">0</h4></div></div>
+  </div>
+
+  <div class="mb-3 text-center">
+    <label class="form-label">เลือกห้องเรียน:</label>
+    <select id="classSelect" class="form-select w-auto d-inline-block mx-2">
+      <option value="">-- เลือกห้องเรียน --</option>
+    </select>
+
+    <label class="form-label ms-2">เลือกวันที่:</label>
+    <input type="date" id="dateSelect" class="form-control d-inline-block w-auto">
+    
+    <button class="btn btn-success ms-2" onclick="exportToExcel()">📥 Export Excel</button>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <canvas id="pieChart"></canvas>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h5 class="mb-3">📋 รายชื่อนักเรียนที่มาแสกน</h5>
+    <div class="table-responsive">
+      <table class="table table-bordered table-striped align-middle text-center" id="studentTable">
+        <thead class="table-dark">
+          <tr>
+            <th>เวลา</th>
+            <th>รหัส</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th>ห้อง</th>
+            <th>เลขที่</th>
+            <th>สถานะ</th>
+            <th>รูปภาพ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h5 class="mb-2 text-warning">⏰ รายชื่อนักเรียนที่มาสาย</h5>
+    <ul id="lateList" class="list-group"></ul>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h5 class="mb-2 text-danger">❌ รายชื่อนักเรียนที่ขาด</h5>
+    <ul id="absentList" class="list-group"></ul>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h5 class="mb-2 text-warning">📌 รายชื่อนักเรียนที่ลากิจ</h5>
+    <ul id="leavePersonalList" class="list-group"></ul>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h5 class="mb-2 text-info">💊 รายชื่อนักเรียนที่ลาป่วย</h5>
+    <ul id="leaveSickList" class="list-group"></ul>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h5 class="mb-2 text-primary">🚪 รายชื่อนักเรียนที่ไม่สแกนกลับบ้าน</h5>
+    <ul id="notCheckoutList" class="list-group"></ul>
+  </div>
+
+  <div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-body text-center">
+          <img id="modalImage" src="" class="img-fluid rounded" alt="Student Image">
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const SHEET_CHECKIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZxpYQHOqzmY_XxPwZUwqBIROIKI-O5aZi7prCkI_TqgYGhLQ9IJQMKON8QpgzPiaf7RkQErLoMKzE/pub?gid=0&single=true&output=csv";
+  const SHEET_STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZxpYQHOqzmY_XxPwZUwqBIROIKI-O5aZi7prCkI_TqgYGhLQ9IJQMKON8QpgzPiaf7RkQErLoMKzE/pub?gid=1824674320&single=true&output=csv";
+  
+  // ⚠️ อย่าลืมตรวจสอบ URL นี้ว่าเป็นตัวล่าสุดที่คุณ Deploy หรือยัง
+  const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzY8AZFeHLhHnnjMod9xxQNVyokFYrL0eOtIAYHY6FB_HptJDKIOnN5FF4yxI1kU9k/exec";
+
+  let allCheckin = [], allStudents = [];
+  let pieChart;
+  let lastUpdateTime = null;
+  let isUpdating = false;
+
+  function loadSheets() {
+    Promise.all([
+      fetch(SHEET_CHECKIN_URL + "&t=" + new Date().getTime()).then(res => res.text()),
+      fetch(SHEET_STUDENT_URL + "&t=" + new Date().getTime()).then(res => res.text())
+    ]).then(([checkinCsv, studentCsv]) => {
+      allCheckin = Papa.parse(checkinCsv, {header:true}).data;
+      allStudents = Papa.parse(studentCsv, {header:true}).data;
+
+      let classes = [...new Set(allStudents.map(r => (r["classroom"]||"").trim()).filter(c => c))];
+      let select = document.getElementById("classSelect");
+      select.innerHTML = `<option value="">-- เลือกห้องเรียน --</option>`;
+      classes.forEach(c => {
+        let opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      });
+
+      // ✅ ตั้งค่าเวลาเป็นปัจจุบัน (แก้ Timezone Offset)
+      let today = new Date();
+      today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+      document.getElementById("dateSelect").value = today.toISOString().split("T")[0];
+
+      select.addEventListener("change", applyFilters);
+      document.getElementById("dateSelect").addEventListener("change", applyFilters);
+      applyFilters();
+    });
+  }
+
+  function clearDashboard() {
+    ["presentCount","lateCount","absentCount","leaveCount","checkoutCount","notCheckoutCount"].forEach(id=>{
+      document.getElementById(id).innerText = "0";
+    });
+    document.querySelector("#studentTable tbody").innerHTML = "";
+    ["lateList","absentList","leavePersonalList","leaveSickList","notCheckoutList"].forEach(id=>{
+      document.getElementById(id).innerHTML = "";
+    });
+    if(pieChart) pieChart.destroy();
+  }
+
+  function applyFilters() {
+    let classVal = document.getElementById("classSelect").value;
+    let dateVal = document.getElementById("dateSelect").value;
+    if(classVal && dateVal) updateDashboard(classVal, dateVal);
+    else clearDashboard();
+  }
+
+  function updateDashboard(filterClass, filterDate) {
+    let statusCount = { "มาเรียน":0, "มาสาย":0, "ขาด":0, "ลากิจ":0, "ลาป่วย":0, "กลับบ้าน":0, "ไม่สแกนกลับ":0 };
+    let tbody = document.querySelector("#studentTable tbody");
+    tbody.innerHTML = "";
+
+    let classStudents = allStudents.filter(s => (s["classroom"]||"").trim() === filterClass);
+    let classStudentIds = classStudents.map(s => s["student_id"]);
+    let checkins = allCheckin.filter(c => (c["ชั้น"]||"").trim() === filterClass);
+    let checkedInIds = new Set();
+    let checkedOutIds = new Set();
+
+    let lateList = document.getElementById("lateList");
+    let absentList = document.getElementById("absentList");
+    let leavePersonalList = document.getElementById("leavePersonalList");
+    let leaveSickList = document.getElementById("leaveSickList");
+    let notCheckoutList = document.getElementById("notCheckoutList");
+    lateList.innerHTML = ""; absentList.innerHTML = "";
+    leavePersonalList.innerHTML = ""; leaveSickList.innerHTML = "";
+    notCheckoutList.innerHTML = "";
+
+    checkins.forEach(row => {
+      let studentId = row["Student ID"];
+      let status = (row["Status"]||"").trim();
+      let timestamp = row["Timestamp"] || "";
+      if(!studentId || !timestamp) return;
+
+      let dateOnly = timestamp.split(" ")[0];  
+      if(filterDate && dateOnly !== filterDate) return;
+
+      checkedInIds.add(studentId);
+      if (status.includes("กลับ")) checkedOutIds.add(studentId);
+
+      if (status.includes("มาสาย")) {
+        statusCount["มาสาย"]++;
+        statusCount["มาเรียน"]++;
+        let li = document.createElement("li");
+        li.className = "list-group-item";
+        li.textContent = `${row["คำนำหน้า"]||""} ${row["ชื่อ"]||""} ${row["นามสกุล"]||""} (${row["ชั้น"]||""}-${row["เลขที่"]||""})`;
+        lateList.appendChild(li);
+
+      } else if (status.includes("ลากิจ")) {
+        statusCount["ลากิจ"]++;
+        let li = document.createElement("li");
+        li.className = "list-group-item";
+        li.textContent = `${row["คำนำหน้า"]||""} ${row["ชื่อ"]||""} ${row["นามสกุล"]||""} (${row["ชั้น"]||""}-${row["เลขที่"]||""})`;
+        leavePersonalList.appendChild(li);
+
+      } else if (status.includes("ลาป่วย")) {
+        statusCount["ลาป่วย"]++;
+        let li = document.createElement("li");
+        li.className = "list-group-item";
+        li.textContent = `${row["คำนำหน้า"]||""} ${row["ชื่อ"]||""} ${row["นามสกุล"]||""} (${row["ชั้น"]||""}-${row["เลขที่"]||""})`;
+        leaveSickList.appendChild(li);
+
+      } else if (status.includes("ลา")) {
+        statusCount["ลากิจ"]++;
+        let li = document.createElement("li");
+        li.className = "list-group-item";
+        li.textContent = `${row["คำนำหน้า"]||""} ${row["ชื่อ"]||""} ${row["นามสกุล"]||""} (${row["ชั้น"]||""}-${row["เลขที่"]||""})`;
+        leavePersonalList.appendChild(li);
+
+      } else if (status.includes("กลับ")) {
+        statusCount["กลับบ้าน"]++;
+
+      } else if (status) {
+        statusCount["มาเรียน"]++;
+      }
+
+      let tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row["Time"] || ""}</td>
+        <td>${studentId}</td>
+        <td>${row["คำนำหน้า"]||""} ${row["ชื่อ"]||""} ${row["นามสกุล"]||""}</td>
+        <td>${row["ชั้น"]||""}</td>
+        <td>${row["เลขที่"]||""}</td>
+        <td>${status}</td>
+        <td>${row["image_link"] ? `<img src="${row["image_link"]}" width="60" onclick="showImageModal('${row["image_link"]}')">` : ""}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // 🔴 แก้ไขจุดที่ 1: ส่ง filterDate ไปในปุ่มกดลา
+    let absentIds = classStudentIds.filter(id => id && !checkedInIds.has(id));
+    statusCount["ขาด"] = absentIds.length;
+    absentIds.forEach(id => {
+      let stu = classStudents.find(s => s["student_id"] === id);
+      if(stu) {
+        let li = document.createElement("li");
+        li.className = "list-group-item";
+        li.innerHTML = `
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+            <span class="mb-2 mb-md-0">
+              ${stu["prefix"]||""} ${stu["fname"]||""} ${stu["lname"]||""} 
+              (${stu["classroom"]||""}-${stu["number"]||""})
+            </span>
+            <div class="btn-group">
+              <button class="btn btn-sm btn-warning" onclick="updateStatus('${stu["student_id"]}','ลากิจ', '${filterDate}')">ลากิจ</button>
+              <button class="btn btn-sm btn-info" onclick="updateStatus('${stu["student_id"]}','ลาป่วย', '${filterDate}')">ลาป่วย</button>
+            </div>
+          </div>
+        `;
+        absentList.appendChild(li);
+      }
+    });
+
+    let notCheckoutIds = classStudentIds.filter(id => checkedInIds.has(id) && !checkedOutIds.has(id));
+    statusCount["ไม่สแกนกลับ"] = notCheckoutIds.length;
+    notCheckoutIds.forEach(id => {
+      let stu = classStudents.find(s => s["student_id"] === id);
+      if(stu) {
+        let li = document.createElement("li");
+        li.className = "list-group-item";
+        li.textContent = `${stu["prefix"]||""} ${stu["fname"]||""} ${stu["lname"]||""} (${stu["classroom"]||""}-${stu["number"]||""})`;
+        notCheckoutList.appendChild(li);
+      }
+    });
+
+    document.getElementById("presentCount").innerText = statusCount["มาเรียน"];
+    document.getElementById("lateCount").innerText = statusCount["มาสาย"];
+    document.getElementById("absentCount").innerText = statusCount["ขาด"];
+    document.getElementById("leaveCount").innerText = statusCount["ลากิจ"] + statusCount["ลาป่วย"];
+    document.getElementById("checkoutCount").innerText = statusCount["กลับบ้าน"];
+    document.getElementById("notCheckoutCount").innerText = statusCount["ไม่สแกนกลับ"];
+
+    if(pieChart) pieChart.destroy();
+    pieChart = new Chart(document.getElementById("pieChart"), {
+      type: "pie",
+      data: { 
+        labels: Object.keys(statusCount), 
+        datasets: [{ 
+          data: Object.values(statusCount), 
+          backgroundColor: ["#28a745","#6c757d","#dc3545","#ffc107","#17a2b8","#6f42c1","#0d6efd"] 
+        }] 
+      }
+    });
+  }
+
+  function showImageModal(src) {
+    document.getElementById("modalImage").src = src;
+    let modal = new bootstrap.Modal(document.getElementById("imageModal"));
+    modal.show();
+  }
+
+  // 🔴 แก้ไขจุดที่ 2: ฟังก์ชันรับวันที่ (targetDate) มาใช้
+  function updateStatus(studentId, newStatus, targetDate) {
+    let stu = allStudents.find(s => s["student_id"] === studentId);
+    if(!stu) return alert("ไม่พบนักเรียน");
+
+    let timestampStr, timeStr;
+
+    // ตรวจสอบว่ามีวันที่ส่งมาไหม (ถ้าเป็นการกดย้อนหลัง targetDate จะมีค่า)
+    if (targetDate) {
+      timestampStr = targetDate + " 08:00:00"; 
+      timeStr = "08:00";
+    } else {
+      let now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      timestampStr = now.toISOString().replace("T"," ").split(".")[0];
+      timeStr = now.toLocaleTimeString("th-TH", { hour: '2-digit', minute: '2-digit' });
+    }
+
+    let payload = {
+      Timestamp: timestampStr,
+      "Student ID": stu["student_id"],
+      "คำนำหน้า": stu["prefix"] || "",
+      "ชื่อ": stu["fname"] || "",
+      "นามสกุล": stu["lname"] || "",
+      "ชั้น": stu["classroom"] || "",
+      "เลขที่": stu["number"] || "",
+      Status: newStatus,
+      Time: timeStr,
+      image_link: ""
+    };
+
+    // UI Update (Client side)
+    let absentList = document.getElementById("absentList");
+    let leavePersonalList = document.getElementById("leavePersonalList");
+    let leaveSickList = document.getElementById("leaveSickList");
+
+    let liToRemove = [...absentList.querySelectorAll("li")]
+      .find(li => li.textContent.includes(stu["fname"]) && li.textContent.includes(stu["lname"]));
+    if(liToRemove) liToRemove.remove();
+
+    let li = document.createElement("li");
+    li.className = "list-group-item";
+    li.textContent = `${stu["prefix"]||""} ${stu["fname"]||""} ${stu["lname"]||""} (${stu["classroom"]||""}-${stu["number"]||""})`;
+    if(newStatus === "ลากิจ") leavePersonalList.appendChild(li);
+    if(newStatus === "ลาป่วย") leaveSickList.appendChild(li);
+
+    document.getElementById("absentCount").innerText = Math.max(0, parseInt(document.getElementById("absentCount").innerText) - 1);
+    document.getElementById("leaveCount").innerText = parseInt(document.getElementById("leaveCount").innerText) + 1;
+
+    allCheckin.push(payload);
+
+    fetch(WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.text())
+    .then(txt => {
+      try {
+        let data = JSON.parse(txt);
+        if (data.result !== "success") {
+           // กรณีมี Error จาก Server
+           console.log("Server response:", data);
+        }
+      } catch(e) {
+        console.log("Saved response:", txt);
+      }
+    })
+    .catch(err => {
+      console.error("Network error:", err);
+      alert("⚠️ ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่");
+    });
+  }
+
+  // ฟังก์ชัน Export Excel
+  function exportToExcel() {
+    let table = document.getElementById("studentTable");
+    let rows = [];
+    
+    let headers = [];
+    table.querySelectorAll("thead th").forEach(th => headers.push(th.innerText));
+    rows.push(headers.join(","));
+
+    table.querySelectorAll("tbody tr").forEach(tr => {
+      let cols = [];
+      tr.querySelectorAll("td").forEach(td => cols.push('"' + td.innerText + '"'));
+      rows.push(cols.join(","));
+    });
+
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + rows.join("\n");
+    let encodedUri = encodeURI(csvContent);
+    let link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "report_checkin_" + document.getElementById("dateSelect").value + ".csv");
+    document.body.appendChild(link);
+    link.click();
+  }
+
+  function checkForUpdates() {
+    if(isUpdating) return;
+    fetch(SHEET_CHECKIN_URL + "&t=" + new Date().getTime())
+      .then(res => res.text())
+      .then(csv => {
+        let data = Papa.parse(csv, {header:true}).data;
+        if (data.length === 0) return;
+
+        let latestRow = data.reduce((a, b) => {
+          let ta = new Date(a["Timestamp"] || 0);
+          let tb = new Date(b["Timestamp"] || 0);
+          return ta > tb ? a : b;
+        });
+
+        let newTime = latestRow["Timestamp"];
+        if (newTime && newTime !== lastUpdateTime) {
+          lastUpdateTime = newTime;
+          allCheckin = data;
+          applyFilters();
+        }
+      })
+      .catch(err => console.error("Update check error:", err));
+  }
+
+  loadSheets();
+  setInterval(checkForUpdates, 5000);
+</script>
+</body>
+</html>

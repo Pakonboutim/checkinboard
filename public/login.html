@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔑 เข้าสู่ระบบนักเรียน</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    body { background: #f0f2f5; font-family: 'Sarabun', sans-serif; }
+    .login-card { max-width: 400px; margin: 12% auto; padding: 2rem; background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .toggle-btn { cursor: pointer; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <h4 class="text-center mb-4">🔑 เข้าสู่ระบบนักเรียน</h4>
+
+    <div class="mb-3">
+      <label class="form-label">รหัสนักเรียน</label>
+      <input type="text" id="studentId" class="form-control" placeholder="กรอกรหัสนักเรียน">
+    </div>
+
+    <div class="mb-3 position-relative">
+      <label class="form-label">รหัสผ่าน</label>
+      <input type="password" id="password" class="form-control" placeholder="กรอกรหัสผ่าน">
+      <span class="toggle-btn text-secondary" onclick="togglePassword()">👁️</span>
+    </div>
+
+    <button class="btn btn-primary w-100" onclick="login()">เข้าสู่ระบบ</button>
+    <div id="errorMsg" class="text-danger mt-3 text-center d-none">❌ รหัสนักเรียนหรือรหัสผ่านไม่ถูกต้อง</div>
+  </div>
+
+<script>
+  const SHEET_STUDENT_URL = 
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZxpYQHOqzmY_XxPwZUwqBIROIKI-O5aZi7prCkI_TqgYGhLQ9IJQMKON8QpgzPiaf7RkQErLoMKzE/pub?gid=1824674320&single=true&output=csv";
+
+  let allStudents = [];
+
+  function normalizeId(id){
+    return (id || "").toString().trim().replace(/^0+/, ""); // ลบ 0 ด้านหน้า
+  }
+
+  // โหลด Student Sheet
+  function loadStudents(callback){
+    fetch(SHEET_STUDENT_URL).then(res=>res.text()).then(csv=>{
+      allStudents = Papa.parse(csv, {header:true}).data;
+      if(callback) callback();
+    });
+  }
+
+  // Toggle password
+  function togglePassword(){
+    let pwd = document.getElementById("password");
+    pwd.type = (pwd.type === "password") ? "text" : "password";
+  }
+
+  // Login function
+  function login(){
+    let sid = normalizeId(document.getElementById("studentId").value.trim());
+    let pwd = document.getElementById("password").value.trim();
+
+    let student = allStudents.find(s => 
+      normalizeId(s["student_id"]) === sid && 
+      ((s["password"]||"")+"").trim() === pwd
+    );
+
+    if(student){
+      window.location.href = `student.html?sid=${sid}&from=login`;
+    } else {
+      document.getElementById("errorMsg").classList.remove("d-none");
+    }
+  }
+
+  // ถ้ามี logout=1 ให้ reset ฟอร์ม
+  window.onload = () => {
+    const params = new URLSearchParams(window.location.search);
+    if(params.get("logout") === "1"){
+      document.getElementById("studentId").value = "";
+      document.getElementById("password").value = "";
+    }
+  }
+
+  loadStudents();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+<script>
+  const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzY8AZFeHLhHnnjMod9xxQNVyokFYrL0eOtIAYHY6FB_HptJDKIOnN5FF4yxI1kU9k/exec";
+  function sendTest() {
+    let payload = {
+      Timestamp: new Date().toISOString().replace("T"," ").slice(0,19),
+      "Student ID": "6075",
+      "คำนำหน้า": "เด็กหญิง",
+      "ชื่อ": "ปาณิศรา",
+      "นามสกุล": "แซ่จัง",
+      "ชั้น": "ม.3/1",
+      "เลขที่": "18",
+      Status: "ลากิจ",   // 👈 ลองเปลี่ยนเป็น "ลาป่วย"
+      Time: new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}),
+      image_link: ""
+    };
+
+    console.log("📤 Sending", payload);
+
+    fetch(WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.text())
+    .then(txt => {
+      console.log("📥 Response:", txt);
+      try {
+        let data = JSON.parse(txt);
+        if (data.result === "success") {
+          alert("✅ บันทึกสำเร็จ Row: " + data.row);
+        } else {
+          alert("❌ Error: " + (data.message || "unknown"));
+        }
+      } catch(e) {
+        alert("❌ JSON parse error: " + e.message);
+      }
+    })
+    .catch(err => alert("❌ Network error: " + err));
+  }
+</script>
+
+<button onclick="sendTest()">🚀 ทดสอบส่ง ลากิจ</button>
