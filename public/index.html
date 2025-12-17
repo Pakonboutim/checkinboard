@@ -128,7 +128,7 @@
   const SHEET_CHECKIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZxpYQHOqzmY_XxPwZUwqBIROIKI-O5aZi7prCkI_TqgYGhLQ9IJQMKON8QpgzPiaf7RkQErLoMKzE/pub?gid=0&single=true&output=csv";
   const SHEET_STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZxpYQHOqzmY_XxPwZUwqBIROIKI-O5aZi7prCkI_TqgYGhLQ9IJQMKON8QpgzPiaf7RkQErLoMKzE/pub?gid=1824674320&single=true&output=csv";
   
-  // ⚠️ อย่าลืมตรวจสอบ URL นี้ว่าเป็นตัวล่าสุดที่คุณ Deploy หรือยัง
+  // ⚠️ ตรวจสอบว่าเป็น URL ของ Apps Script เวอร์ชันล่าสุดที่คุณ Deploy
   const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzY8AZFeHLhHnnjMod9xxQNVyokFYrL0eOtIAYHY6FB_HptJDKIOnN5FF4yxI1kU9k/exec";
 
   let allCheckin = [], allStudents = [];
@@ -154,7 +154,6 @@
         select.appendChild(opt);
       });
 
-      // ✅ ตั้งค่าเวลาเป็นปัจจุบัน (แก้ Timezone Offset)
       let today = new Date();
       today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
       document.getElementById("dateSelect").value = today.toISOString().split("T")[0];
@@ -264,7 +263,6 @@
       tbody.appendChild(tr);
     });
 
-    // 🔴 แก้ไขจุดที่ 1: ส่ง filterDate ไปในปุ่มกดลา
     let absentIds = classStudentIds.filter(id => id && !checkedInIds.has(id));
     statusCount["ขาด"] = absentIds.length;
     absentIds.forEach(id => {
@@ -279,8 +277,8 @@
               (${stu["classroom"]||""}-${stu["number"]||""})
             </span>
             <div class="btn-group">
-              <button class="btn btn-sm btn-warning" onclick="updateStatus('${stu["student_id"]}','ลากิจ', '${filterDate}')">ลากิจ</button>
-              <button class="btn btn-sm btn-info" onclick="updateStatus('${stu["student_id"]}','ลาป่วย', '${filterDate}')">ลาป่วย</button>
+              <button class="btn btn-sm btn-warning" onclick="updateStatus('${stu["student_id"]}','ลากิจ')">ลากิจ</button>
+              <button class="btn btn-sm btn-info" onclick="updateStatus('${stu["student_id"]}','ลาป่วย')">ลาป่วย</button>
             </div>
           </div>
         `;
@@ -326,18 +324,29 @@
     modal.show();
   }
 
-  // 🔴 แก้ไขจุดที่ 2: ฟังก์ชันรับวันที่ (targetDate) มาใช้
-  function updateStatus(studentId, newStatus, targetDate) {
+  // ✅ ฟังก์ชันบันทึกข้อมูล (ฉบับแก้แล้ว 100%)
+  function updateStatus(studentId, newStatus) {
     let stu = allStudents.find(s => s["student_id"] === studentId);
     if(!stu) return alert("ไม่พบนักเรียน");
 
     let timestampStr, timeStr;
 
-    // ตรวจสอบว่ามีวันที่ส่งมาไหม (ถ้าเป็นการกดย้อนหลัง targetDate จะมีค่า)
-    if (targetDate) {
-      timestampStr = targetDate + " 08:00:00"; 
+    // ✅ 1. ดึงค่าวันที่จากช่อง Date Picker โดยตรง
+    let dateInput = document.getElementById("dateSelect").value; // รูปแบบ YYYY-MM-DD
+    
+    // ✅ 2. ตรวจสอบว่าเป็น "วันนี้" หรือ "อดีต"
+    // หา "วันนี้" แบบ Local Timezone ของเครื่องผู้ใช้
+    let todayObj = new Date();
+    todayObj.setMinutes(todayObj.getMinutes() - todayObj.getTimezoneOffset());
+    let todayStr = todayObj.toISOString().split("T")[0];
+
+    // ถ้ามีการเลือกวันที่ และ วันที่นั้น "ไม่ใช่วันนี้" (แสดงว่ากดย้อนหลัง)
+    if (dateInput && dateInput !== todayStr) {
+      // 🟢 บังคับใช้ Date ที่เลือก + เวลา 08:00:00
+      timestampStr = dateInput + " 08:00:00"; 
       timeStr = "08:00";
     } else {
+      // 🔵 ใช้วันเวลาปัจจุบัน (Real-time)
       let now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
       timestampStr = now.toISOString().replace("T"," ").split(".")[0];
@@ -345,7 +354,7 @@
     }
 
     let payload = {
-      Timestamp: timestampStr,
+      Timestamp: timestampStr, // ส่งตัวแปรที่คำนวณแล้วไป
       "Student ID": stu["student_id"],
       "คำนำหน้า": stu["prefix"] || "",
       "ชื่อ": stu["fname"] || "",
@@ -357,7 +366,7 @@
       image_link: ""
     };
 
-    // UI Update (Client side)
+    // UI Update
     let absentList = document.getElementById("absentList");
     let leavePersonalList = document.getElementById("leavePersonalList");
     let leaveSickList = document.getElementById("leaveSickList");
@@ -377,30 +386,22 @@
 
     allCheckin.push(payload);
 
+    // 💡 Debug: แสดงค่าที่กำลังจะส่งใน Console
+    console.log("Sending Data to Sheet:", payload);
+
     fetch(WEBAPP_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     })
     .then(res => res.text())
-    .then(txt => {
-      try {
-        let data = JSON.parse(txt);
-        if (data.result !== "success") {
-           // กรณีมี Error จาก Server
-           console.log("Server response:", data);
-        }
-      } catch(e) {
-        console.log("Saved response:", txt);
-      }
-    })
+    .then(txt => console.log("Server Response:", txt))
     .catch(err => {
-      console.error("Network error:", err);
-      alert("⚠️ ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่");
+      console.error("Error:", err);
+      alert("⚠️ บันทึกไม่สำเร็จ");
     });
   }
 
-  // ฟังก์ชัน Export Excel
   function exportToExcel() {
     let table = document.getElementById("studentTable");
     let rows = [];
