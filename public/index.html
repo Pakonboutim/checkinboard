@@ -325,45 +325,42 @@
   }
 
   // ✅ ฟังก์ชันบันทึกข้อมูล (ฉบับแก้แล้ว 100%)
-  function updateStatus(studentId, newStatus) {
+function updateStatus(studentId, newStatus) {
     let stu = allStudents.find(s => s["student_id"] === studentId);
     if(!stu) return alert("ไม่พบนักเรียน");
 
     let timestampStr, timeStr;
 
-    // ✅ 1. ดึงค่าวันที่จากช่อง Date Picker โดยตรง
-    let dateInput = document.getElementById("dateSelect").value; // รูปแบบ YYYY-MM-DD
+    // 1. ดึงค่าวันที่จาก Date Picker
+    let dateInput = document.getElementById("dateSelect").value; // คืนค่าเป็น YYYY-MM-DD
     
-    // ✅ 2. ตรวจสอบว่าเป็น "วันนี้" หรือ "อดีต"
-    // หา "วันนี้" แบบ Local Timezone ของเครื่องผู้ใช้
-    let todayObj = new Date();
-    todayObj.setMinutes(todayObj.getMinutes() - todayObj.getTimezoneOffset());
-    let todayStr = todayObj.toISOString().split("T")[0];
-
-    // ถ้ามีการเลือกวันที่ และ วันที่นั้น "ไม่ใช่วันนี้" (แสดงว่ากดย้อนหลัง)
-    if (dateInput && dateInput !== todayStr) {
-      // 🟢 บังคับใช้ Date ที่เลือก + เวลา 08:00:00
-      timestampStr = dateInput + " 08:00:00"; 
+    // 2. จัดการเรื่องวันที่ให้เป็นมาตรฐาน
+    if (dateInput) {
+      // ใช้รูปแบบ YYYY/MM/DD เพื่อให้ Apps Script แปลงเป็น Date Object ได้แม่นยำที่สุด
+      let formattedDate = dateInput.replace(/-/g, "/"); 
+      
+      // ถ้าเป็นการกดย้อนหลัง (หรือเลือกวันที่จากปฏิทิน)
+      // เราจะส่งวันที่นั้นไปพร้อมเวลา 08:00:00 (หรือเวลาที่ต้องการ)
+      timestampStr = formattedDate + " 08:00:00";
       timeStr = "08:00";
     } else {
-      // 🔵 ใช้วันเวลาปัจจุบัน (Real-time)
+      // กรณีไม่ได้เลือกวันที่ ให้ใช้เวลาปัจจุบัน
       let now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      timestampStr = now.toISOString().replace("T"," ").split(".")[0];
-      timeStr = now.toLocaleTimeString("th-TH", { hour: '2-digit', minute: '2-digit' });
+      timestampStr = now.toLocaleString('en-US', { hour12: false }).replace(/,/g, '');
+      timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
     }
 
     let payload = {
-      Timestamp: timestampStr, // ส่งตัวแปรที่คำนวณแล้วไป
+      "Timestamp": timestampStr, // ส่งค่านี้ไปที่ doPost
       "Student ID": stu["student_id"],
       "คำนำหน้า": stu["prefix"] || "",
       "ชื่อ": stu["fname"] || "",
       "นามสกุล": stu["lname"] || "",
       "ชั้น": stu["classroom"] || "",
       "เลขที่": stu["number"] || "",
-      Status: newStatus,
-      Time: timeStr,
-      image_link: ""
+      "Status": newStatus,
+      "Time": timeStr,
+      "image_link": ""
     };
 
     // UI Update
