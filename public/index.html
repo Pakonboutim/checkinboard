@@ -331,27 +331,24 @@ function updateStatus(studentId, newStatus) {
 
     let timestampStr, timeStr;
 
-    // 1. ดึงค่าวันที่จาก Date Picker
-    let dateInput = document.getElementById("dateSelect").value; // คืนค่าเป็น YYYY-MM-DD
+    // 1. ดึงค่าจาก Date Picker โดยตรง
+    let dateInput = document.getElementById("dateSelect").value; 
     
-    // 2. จัดการเรื่องวันที่ให้เป็นมาตรฐาน
+    // 2. บังคับให้ใช้ค่าจาก dateSelect เสมอ (เพื่อให้ย้อนหลังได้ตามหน้าจอที่ครูเห็น)
     if (dateInput) {
-      // ใช้รูปแบบ YYYY/MM/DD เพื่อให้ Apps Script แปลงเป็น Date Object ได้แม่นยำที่สุด
+      // แปลง "-" เป็น "/" เพื่อความแม่นยำของ Apps Script
       let formattedDate = dateInput.replace(/-/g, "/"); 
-      
-      // ถ้าเป็นการกดย้อนหลัง (หรือเลือกวันที่จากปฏิทิน)
-      // เราจะส่งวันที่นั้นไปพร้อมเวลา 08:00:00 (หรือเวลาที่ต้องการ)
-      timestampStr = formattedDate + " 08:00:00";
+      timestampStr = formattedDate + " 08:00:00"; 
       timeStr = "08:00";
     } else {
-      // กรณีไม่ได้เลือกวันที่ ให้ใช้เวลาปัจจุบัน
+      // กรณีฉุกเฉินถ้าไม่มีค่าในช่องวันที่จริงๆ ให้ใช้ปัจจุบัน
       let now = new Date();
       timestampStr = now.toLocaleString('en-US', { hour12: false }).replace(/,/g, '');
       timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
     }
 
     let payload = {
-      "Timestamp": timestampStr, // ส่งค่านี้ไปที่ doPost
+      "Timestamp": timestampStr, 
       "Student ID": stu["student_id"],
       "คำนำหน้า": stu["prefix"] || "",
       "ชื่อ": stu["fname"] || "",
