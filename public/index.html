@@ -326,29 +326,29 @@
 
   // ✅ ฟังก์ชันบันทึกข้อมูล (ฉบับแก้แล้ว 100%)
 function updateStatus(studentId, newStatus) {
-    let stu = allStudents.find(s => s["student_id"] === studentId);
-    if(!stu) return alert("ไม่พบนักเรียน");
+    // 1. เช็คก่อนว่าฟังก์ชันทำงานไหม
+    console.log("เริ่มบันทึกสถานะ:", newStatus, "สำหรับรหัส:", studentId);
 
+    let stu = allStudents.find(s => s["student_id"] === studentId);
+    if(!stu) return alert("ไม่พบข้อมูลนักเรียน");
+
+    // 2. ดึงวันที่จากช่องเลือกวันที่ (dateSelect)
+    let dateInput = document.getElementById("dateSelect").value; 
     let timestampStr, timeStr;
 
-    // 1. ดึงค่าจาก Date Picker โดยตรง
-    let dateInput = document.getElementById("dateSelect").value; 
-    
-    // 2. บังคับให้ใช้ค่าจาก dateSelect เสมอ (เพื่อให้ย้อนหลังได้ตามหน้าจอที่ครูเห็น)
     if (dateInput) {
-      // แปลง "-" เป็น "/" เพื่อความแม่นยำของ Apps Script
-      let formattedDate = dateInput.replace(/-/g, "/"); 
-      timestampStr = formattedDate + " 08:00:00"; 
+      // บังคับใช้รูปแบบที่ Apps Script เข้าใจง่าย (YYYY-MM-DD)
+      timestampStr = dateInput + "T08:00:00"; 
       timeStr = "08:00";
     } else {
-      // กรณีฉุกเฉินถ้าไม่มีค่าในช่องวันที่จริงๆ ให้ใช้ปัจจุบัน
+      // ถ้าไม่ได้เลือกวันที่จริงๆ ให้ใช้ปัจจุบัน
       let now = new Date();
-      timestampStr = now.toLocaleString('en-US', { hour12: false }).replace(/,/g, '');
+      timestampStr = now.toISOString();
       timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
     }
 
     let payload = {
-      "Timestamp": timestampStr, 
+      "Timestamp": timestampStr, // ส่งค่าวันที่ย้อนหลังไปที่ Apps Script
       "Student ID": stu["student_id"],
       "คำนำหน้า": stu["prefix"] || "",
       "ชื่อ": stu["fname"] || "",
@@ -359,6 +359,26 @@ function updateStatus(studentId, newStatus) {
       "Time": timeStr,
       "image_link": ""
     };
+
+    console.log("ข้อมูลที่จะส่งไป Sheet:", payload);
+
+    // 3. ส่งข้อมูลไปที่ Apps Script
+    fetch(WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.text())
+    .then(txt => {
+      console.log("ผลตอบรับจาก Server:", txt);
+      alert("บันทึก " + newStatus + " สำเร็จ!");
+      // ไม่ต้อง reload หน้าเว็บเพื่อให้ตรวจสอบผลในหน้าจอได้ทันที
+    })
+    .catch(err => {
+      console.error("เกิดข้อผิดพลาด:", err);
+      alert("บันทึกไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต");
+    });
+}
 
     // UI Update
     let absentList = document.getElementById("absentList");
@@ -394,7 +414,6 @@ function updateStatus(studentId, newStatus) {
       console.error("Error:", err);
       alert("⚠️ บันทึกไม่สำเร็จ");
     });
-  }
 
   function exportToExcel() {
     let table = document.getElementById("studentTable");
